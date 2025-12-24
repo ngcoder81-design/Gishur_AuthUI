@@ -1,0 +1,350 @@
+@using AuthManagement.Models
+@using AuthManagement.Helpers
+@using System.ComponentModel.DataAnnotations
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop show" @onclick:stopPropagation="true"></div>
+    <div class="modal show d-block animate__animated animate__pulse" tabindex="-1" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="ti tabler-sparkles" style="color: #7c3aed; margin-right: 8px;"></i>
+                        @(IsEditMode ? "Edit Feature" : "Add Feature")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="HandleCancel" disabled="@IsSaving"></button>
+                </div>
+                <div class="modal-body" style="padding: 24px;">
+                    <EditForm Model="@FormModel" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Parent Feature</label>
+                            <select @bind="FormModel.ParentFeatureId" @bind:after="OnParentFeatureChanged" class="form-control" disabled="@IsSaving">
+                                <option value="">No Parent (Top Level)</option>
+                                @foreach (var feature in ParentFeatures.Where(f => f.IsMainMenu && (!IsEditMode || f.Id != FormModel.Id)))
+                                {
+                                    <option value="@feature.Id">@feature.Name</option>
+                                }
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Code<span class="text-danger">*</span></label>
+                            <input type="text"
+                                   class="form-control @(codeValidationError != null ? "is-invalid" : "")" 
+                                   placeholder="Enter code (e.g., DASH, RBAC)"
+                                   value="@FormModel.Code"
+                                   data-input-type="code"
+                                   @oninput="OnCodeInput"
+                                   disabled="@(IsSaving || IsEditMode)"
+                                   maxlength="10"
+                                   style="text-transform: uppercase;" />
+                            @if (codeValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@codeValidationError</div>
+                            }
+                            @if (IsEditMode)
+                            {
+                                <small class="text-muted">Code cannot be changed after creation</small>
+                            }
+                            <ValidationMessage For="@(() => FormModel.Code)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Feature Name<span class="text-danger">*</span></label>
+                            <input type="text" id="popupFirstInput"
+                                   class="form-control @(nameValidationError != null ? "is-invalid" : "")" 
+                                   placeholder="Enter feature name"
+                                   value="@FormModel.Name"
+                                   @oninput="OnNameInput"
+                                   data-input-type="name"
+                                   disabled="@IsSaving" />
+                            @if (nameValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@nameValidationError</div>
+                            }
+                            <ValidationMessage For="@(() => FormModel.Name)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control @(descriptionValidationError != null ? "is-invalid" : "")" 
+                                      placeholder="Enter description" 
+                                      rows="3"
+                                      @oninput="OnDescriptionInput"
+                                      disabled="@IsSaving">@FormModel.Description</textarea>
+                            @if (descriptionValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@descriptionValidationError</div>
+                            }
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Display Order<span class="text-danger">*</span></label>
+                            <InputNumber @bind-Value="FormModel.DisplayOrder" class="form-control" min="0" disabled="@IsSaving" />
+                            <ValidationMessage For="@(() => FormModel.DisplayOrder)" class="text-danger" />
+                           @*  @if (FormModel.DisplayOrder < 0)
+                            {
+                                <span class="text-danger">Display order cannot be negative</span>
+                            } *@
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Icon Class</label>
+                            <InputText @bind-Value="FormModel.Icon" class="form-control" placeholder="ti-icon-name" disabled="@IsSaving" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="FormModel.IsMainMenu" class="form-check-input" id="isMainMenu" disabled="@(_isMainMenuDisabled || IsSaving)" />
+                                <label class="form-check-label" for="isMainMenu">Is Main Menu</label>
+                            </div>
+                            @if (_isMainMenuRequired && !FormModel.IsMainMenu)
+                            {
+                                <span class="text-danger">Main features (with no parent) must be marked as Main Menu</span>
+                            }
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-label-secondary" @onclick="HandleCancel" disabled="@IsSaving">Cancel</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(IsSaving || HasValidationErrors())">
+                                @if (IsSaving) { <span class="spinner-border spinner-border-sm me-2"></span><span>Saving...</span> }
+                                else
+                                {
+                                    <i class="ti tabler-check me-1"></i>
+                                    <span>@(IsEditMode ? "Update" : "Create")</span>
+     }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-backdrop { position: fixed; top: 0; left: 0; z-index: 11111; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.5); }
+    .modal { z-index: 11111; }
+    .modal-dialog-centered { min-height: calc(100% - 3.5rem); display: flex; align-items: center; margin: 1.75rem auto; max-width: 540px; width: 100%; padding: 0 15px; }
+    .modal-content { border-radius: 8px; border: none; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #e9ecef; }
+    .modal-title { font-size: 18px; font-weight: 600; color: #333; display: flex; align-items: center; margin: 0; }
+    .btn-close { border-radius: 1rem !important; }
+    .form-label { font-weight: 500; color: #333; margin-bottom: 8px; font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .form-control { border: 1px solid #d9d9e3; border-radius: 6px; padding: 10px 12px; font-size: 14px; }
+
+        .form-control:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 0.2rem rgba(124, 58, 237, 0.1);
+            outline: none;
+            padding-block: 9px;
+        }
+    .btn-primary { background-color: #7c3aed; border-color: #7c3aed; color: white; padding: 8px 20px; font-size: 14px; font-weight: 500; border-radius: 6px; }
+    .btn-label-secondary { background-color: transparent; border: 1px solid #d9d9e3; color: #666; padding: 8px 20px; font-size: 14px; font-weight: 500; border-radius: 6px; }
+    .text-danger { color: #dc3545; font-size: 12px; margin-top: 4px; display: block; }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool IsEditMode { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public FeatureFormModel FormModel { get; set; } = new();
+    [Parameter] public List<FeatureDto> ParentFeatures { get; set; } = new();
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<FeatureFormModel> OnSubmit { get; set; }
+
+    private Guid? _currentFeatureId;
+    private bool _isMainMenuDisabled = false;
+    private bool _isMainMenuRequired = false;
+
+    protected override void OnParametersSet()
+    {
+        _currentFeatureId = FormModel.Id;
+        UpdateMainMenuValidation();
+    }
+
+    private void OnParentFeatureChanged()
+    {
+        UpdateMainMenuValidation();
+        // Auto-set Level based on ParentFeatureId
+        FormModel.Level = FormModel.ParentFeatureId.HasValue ? 1 : 0;
+        StateHasChanged();
+    }
+
+    private void UpdateMainMenuValidation()
+    {
+        // If Parent Feature is selected, disable IsMainMenu and set to false
+        if (FormModel.ParentFeatureId.HasValue && FormModel.ParentFeatureId != Guid.Empty)
+        {
+            _isMainMenuDisabled = true;
+            _isMainMenuRequired = false;
+            FormModel.IsMainMenu = false;
+            FormModel.Level = 1;
+        }
+        // If No Parent, enable IsMainMenu and require it to be checked
+        else
+        {
+            _isMainMenuDisabled = false;
+            _isMainMenuRequired = true;
+            FormModel.IsMainMenu = true; // Auto-check for main features
+            FormModel.Level = 0;
+        }
+    }
+
+    private async Task HandleCancel() 
+    { 
+        if (!IsSaving) 
+        {
+            // Reset validation errors
+            codeValidationError = null;
+            nameValidationError = null;
+            descriptionValidationError = null;
+            await OnCancel.InvokeAsync(); 
+        }
+    }
+    
+    // Issue #2: Validation error messages
+    private string? codeValidationError;
+    private string? nameValidationError;
+    private string? descriptionValidationError;
+
+    // Real-time input validation for Code field
+    private void OnCodeInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString()?.ToUpper() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Code, required: true);
+        
+        if (!isValid)
+        {
+            codeValidationError = errorMessage;
+            FormModel.Code = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Code);
+        }
+        else
+        {
+            codeValidationError = null;
+            FormModel.Code = rawValue;
+        }
+    }
+
+    // Issue #2: Real-time input validation for Name field
+    private void OnNameInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Name, required: true);
+        
+        if (!isValid)
+        {
+            nameValidationError = errorMessage;
+            FormModel.Name = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Name);
+        }
+        else
+        {
+            nameValidationError = null;
+            FormModel.Name = rawValue;
+        }
+    }
+
+    // Issue #2: Real-time input validation for Description field
+    private void OnDescriptionInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Description, required: false);
+        
+        if (!isValid)
+        {
+            descriptionValidationError = errorMessage;
+            FormModel.Description = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Description);
+        }
+        else
+        {
+            descriptionValidationError = null;
+            FormModel.Description = rawValue;
+        }
+    }
+
+    private bool HasValidationErrors()
+    {
+        return codeValidationError != null || nameValidationError != null || descriptionValidationError != null;
+    }
+    
+    private async Task HandleValidSubmit()
+    {
+        // Issue #2: Final validation before submit
+        var (codeValid, codeError) = IsEditMode ? (true, null) : InputValidationHelper.ValidateInput(FormModel.Code, InputTypeEnum.Code, required: true);
+        var (nameValid, nameError) = InputValidationHelper.ValidateInput(FormModel.Name, InputTypeEnum.Name, required: true);
+        var (descValid, descError) = InputValidationHelper.ValidateInput(FormModel.Description, InputTypeEnum.Description, required: false);
+        
+        codeValidationError = codeError;
+        nameValidationError = nameError;
+        descriptionValidationError = descError;
+        
+        if (!codeValid || !nameValid || !descValid || HasValidationErrors())
+        {
+            return;
+        }
+        
+        // Sanitize before submit
+        if (!IsEditMode)
+        {
+            FormModel.Code = FormModel.Code.ToUpper();
+        }
+        FormModel.Name = InputValidationHelper.Sanitize(FormModel.Name);
+        FormModel.Description = InputValidationHelper.SanitizeText(FormModel.Description);
+
+        // Validate DisplayOrder is not negative
+        if (FormModel.DisplayOrder < 0)
+        {
+            return; // Don't submit if invalid
+        }
+
+        // Validate IsMainMenu requirement for top-level features
+        if (!FormModel.ParentFeatureId.HasValue && !FormModel.IsMainMenu)
+        {
+            return; // Don't submit if invalid
+        }
+
+        // Ensure Level is set correctly before submitting
+        FormModel.Level = FormModel.ParentFeatureId.HasValue ? 1 : 0;
+
+        // RouteUrl is not shown to user, so we can set it to null or empty
+        FormModel.RouteUrl = null;
+
+        await OnSubmit.InvokeAsync(FormModel);
+    }
+
+    public class FeatureFormModel
+    {
+        public Guid Id { get; set; }
+        
+        [Required(ErrorMessage = "Code is required")]
+        [StringLength(10, ErrorMessage = "Code cannot exceed 10 characters")]
+        [RegularExpression(@"^[A-Z0-9\-_]+$", ErrorMessage = "Code must contain only uppercase letters, numbers, hyphens, and underscores")]
+        public string Code { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "Name is required")]
+        [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
+        public string? Description { get; set; }
+
+        public string? RouteUrl { get; set; } // Hidden from user
+        public bool IsMainMenu { get; set; }
+        public Guid? ParentFeatureId { get; set; }
+        
+        [Required(ErrorMessage = "Display order is required")]
+        [Range(0, int.MaxValue, ErrorMessage = "Display order cannot be negative")]
+        public int DisplayOrder { get; set; }
+        
+        public int Level { get; set; } // Hidden from user, auto-calculated
+        
+        public string? Icon { get; set; }
+    }
+}

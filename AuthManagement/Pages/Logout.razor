@@ -1,0 +1,51 @@
+@page "/logout"
+@using AuthManagement.Shared
+@using AuthManagement.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject JwtAuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
+@inject HttpClient Http
+@inject NavigationManager Nav
+@layout AuthLayout
+
+<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+    <LoadingSpinner FullPage="true" />
+
+</div>
+
+@code {
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialize input sanitization and search clear buttons
+            await JS.InvokeVoidAsync("InputSanitizer.initializeAllInputs");
+            await JS.InvokeVoidAsync("InputSanitizer.initializeAllSearchBoxes");
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await AuthProvider.GetTokenAsync();
+        if (!string.IsNullOrEmpty(token))
+        {
+            Http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        }
+
+        try
+        {
+            await Http.PostAsync("/auth/logout", null);
+        }
+        catch
+        {
+            // ignore network errors
+        }
+
+        await AuthProvider.ClearAsync();
+        
+        // Redirect to login page
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}

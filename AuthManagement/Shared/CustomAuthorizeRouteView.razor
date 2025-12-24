@@ -1,0 +1,115 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Rendering
+@using Microsoft.AspNetCore.Components.Routing
+@using AuthManagement.Services
+@inject PageAccessService PageAccessService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+@if (IsCheckingAccess)
+{
+    <LoadingSpinner FullPage="true" />
+
+}
+else if (!HasAccess)
+{
+    @* Fallback - typically we redirect before reaching here *@
+    <div class="container-xxl flex-grow-1 container-p-y">
+        <div class="misc-wrapper text-center">
+            <h2 class="mb-1 mx-2">Access Denied</h2>
+            <p class="mb-4 mx-2">You don't have permission to access this page.</p>
+            <a href="/dashboard" class="btn btn-primary mb-4">Back to Dashboard</a>
+        </div>
+    </div>
+}
+else
+{
+    <AuthorizeRouteView RouteData="RouteData" DefaultLayout="DefaultLayout">
+        <NotAuthorized>
+            <RedirectToLogin />
+        </NotAuthorized>
+        <Authorizing>
+
+            <LoadingSpinner FullPage="true" />
+
+        </Authorizing>
+    </AuthorizeRouteView>
+}
+
+@code {
+    [Parameter]
+    public RouteData RouteData { get; set; } = default!;
+
+    [Parameter]
+    public Type? DefaultLayout { get; set; }
+
+    private bool IsCheckingAccess { get; set; } = true;
+    private bool HasAccess { get; set; } = false;
+    
+    //  Track last checked URL to avoid unnecessary re-checks
+    private string? _lastCheckedUrl;
+    private bool _lastCheckResult;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var currentUrl = new Uri(NavigationManager.Uri).LocalPath;
+        
+        //  OPTIMIZATION: Only re-check access if URL actually changed
+        // This prevents unnecessary access checks when auth state changes but URL is the same
+        if (_lastCheckedUrl == currentUrl && _lastCheckResult)
+        {
+            // Same URL and we had access before - no need to re-check
+            HasAccess = true;
+            IsCheckingAccess = false;
+            await base.OnParametersSetAsync();
+            return;
+        }
+        
+        await CheckPageAccessAsync(currentUrl);
+        await base.OnParametersSetAsync();
+    }
+
+    private async Task CheckPageAccessAsync(string currentUrl)
+    {
+        IsCheckingAccess = true;
+        HasAccess = false;
+
+        // Check page access
+        var result = await PageAccessService.HasAccessToPageAsync(currentUrl);
+
+        if (!result.HasAccess)
+        {
+            _lastCheckedUrl = currentUrl;
+            _lastCheckResult = false;
+            
+            if (result.RequiresAuthentication)
+            {
+                // User not authenticated, redirect to login
+                NavigationManager.NavigateTo("/login", true);
+                return;
+            }
+            else
+            {
+                // User authenticated but no access, redirect to access denied
+                NavigationManager.NavigateTo("/access-denied", true);
+                return;
+            }
+        }
+
+        //  Cache successful access check
+        _lastCheckedUrl = currentUrl;
+        _lastCheckResult = true;
+        
+        HasAccess = true;
+        IsCheckingAccess = false;
+    }
+    
+    //  Method to force re-check (can be called if permissions might have changed)
+    public async Task ForceAccessCheckAsync()
+    {
+        _lastCheckedUrl = null;
+        _lastCheckResult = false;
+        var currentUrl = new Uri(NavigationManager.Uri).LocalPath;
+        await CheckPageAccessAsync(currentUrl);
+    }
+}

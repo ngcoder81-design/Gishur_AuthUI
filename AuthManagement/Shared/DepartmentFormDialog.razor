@@ -1,0 +1,400 @@
+@using AuthManagement.Models
+@using AuthManagement.Helpers
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JS
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop show" @onclick:stopPropagation="true"></div>
+    
+    <div class="modal show d-block animate__animated animate__pulse" tabindex="-1" @onclick:stopPropagation="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="ti tabler-building" style="color: #7c3aed; margin-right: 8px;"></i>
+                        @(IsEditMode ? "Edit Department" : "Add Department")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="HandleCancel" disabled="@IsSaving"></button>
+                </div>
+                <div class="modal-body" style="padding: 24px;">
+                    <EditForm Model="@FormModel" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Code<span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="popupFirstInput"
+                                   class="form-control @(codeValidationError != null ? "is-invalid" : "")" 
+                                   placeholder="Enter code (e.g., FIN, HR, MKT)"
+                                   value="@FormModel.Code"
+                                   data-input-type="code"
+                                   @oninput="OnCodeInput"
+                                   disabled="@(IsSaving || IsEditMode)"
+                                   maxlength="10"
+                                   style="text-transform: uppercase;" />
+                            @if (codeValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@codeValidationError</div>
+                            }
+                            @if (IsEditMode)
+                            {
+                                <small class="text-muted">Code cannot be changed after creation</small>
+                            }
+                            <ValidationMessage For="@(() => FormModel.Code)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Department Name<span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control @(nameValidationError != null ? "is-invalid" : "")" 
+                                   placeholder="Enter department name"
+                                   value="@FormModel.Name"
+                                   data-input-type="name"
+                                   @oninput="OnNameInput"
+                                   disabled="@IsSaving" />
+                            @if (nameValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@nameValidationError</div>
+                            }
+                            <ValidationMessage For="@(() => FormModel.Name)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control @(descriptionValidationError != null ? "is-invalid" : "")" 
+                                      placeholder="Enter description"
+                                      rows="4"
+                                      @oninput="OnDescriptionInput"
+                                      disabled="@IsSaving">@FormModel.Description</textarea>
+                            @if (descriptionValidationError != null)
+                            {
+                                <div class="invalid-feedback d-block">@descriptionValidationError</div>
+                            }
+                            <ValidationMessage For="@(() => FormModel.Description)" class="text-danger" />
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" 
+                                    class="btn btn-label-secondary" 
+                                    @onclick="HandleCancel"
+                                    disabled="@IsSaving">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="btn btn-primary" 
+                                    disabled="@(IsSaving || HasValidationErrors())">
+                                @if (IsSaving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <i class="ti tabler-check me-1"></i>
+                                    <span>@(IsEditMode ? "Update" : "Create")</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 111111;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal {
+        z-index: 11111111;
+    }
+
+    .modal-dialog-centered {
+        min-height: calc(100% - 3.5rem);
+        display: flex;
+        align-items: center;
+        margin: 1.75rem auto;
+        max-width: 540px;
+        width: 100%;
+        padding: 0 15px;
+    }
+
+    .modal-content {
+        border-radius: 8px;
+        border: none;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        overflow: visible;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        display: flex;
+        align-items: center;
+        margin: 0;
+    }
+
+    .btn-close {
+        border-radius: 1rem !important;
+    }
+
+    .form-label {
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .form-control {
+        border: 1px solid #d9d9e3;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+
+    .form-control:focus {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 0.2rem rgba(124, 58, 237, 0.1);
+        outline: none;
+         padding-block: 9px;
+    }
+
+    .form-control:disabled {
+        background-color: #f5f5f5;
+        opacity: 0.7;
+    }
+    
+    .form-control.is-invalid {
+        border-color: #dc3545;
+    }
+    
+    .invalid-feedback {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .btn-primary {
+        background-color: #7c3aed;
+        border-color: #7c3aed;
+        color: white;
+        padding: 8px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 6px;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background-color: #6d28d9;
+        border-color: #6d28d9;
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .btn-label-secondary {
+        background-color: transparent;
+        border: 1px solid #d9d9e3;
+        color: #666;
+        padding: 8px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        border-radius: 6px;
+    }
+
+    .btn-label-secondary:hover:not(:disabled) {
+        background-color: #f5f5f5;
+        border-color: #d9d9e3;
+    }
+
+    .text-danger {
+        color: #dc3545;
+        font-size: 12px;
+        margin-top: 4px;
+        display: block;
+    }
+    
+    .form-label .text-danger {
+        display: inline;
+        margin: 0;
+        margin-left: 2px;
+        font-size: inherit;
+    }
+
+    .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public bool IsEditMode { get; set; }
+
+    [Parameter]
+    public bool IsSaving { get; set; }
+
+    [Parameter]
+    public DepartmentFormModel FormModel { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback<DepartmentFormModel> OnSubmit { get; set; }
+
+    // Issue #2: Validation error messages
+    private string? codeValidationError;
+    private string? nameValidationError;
+    private string? descriptionValidationError;
+
+    // Real-time input validation for Code field
+    private void OnCodeInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString()?.ToUpper() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Code, required: true);
+        
+        if (!isValid)
+        {
+            codeValidationError = errorMessage;
+            // Filter out invalid characters and convert to uppercase
+            FormModel.Code = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Code);
+        }
+        else
+        {
+            codeValidationError = null;
+            FormModel.Code = rawValue;
+        }
+    }
+
+    // Issue #2: Real-time input validation for Name field
+    private void OnNameInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Name, required: true);
+        
+        if (!isValid)
+        {
+            nameValidationError = errorMessage;
+            // Filter out invalid characters
+            FormModel.Name = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Name);
+        }
+        else
+        {
+            nameValidationError = null;
+            FormModel.Name = rawValue;
+        }
+    }
+
+    // Issue #2: Real-time input validation for Description field
+    private void OnDescriptionInput(ChangeEventArgs e)
+    {
+        var rawValue = e.Value?.ToString() ?? string.Empty;
+        var (isValid, errorMessage) = InputValidationHelper.ValidateInput(rawValue, InputTypeEnum.Description, required: false);
+        
+        if (!isValid)
+        {
+            descriptionValidationError = errorMessage;
+            // Filter out invalid characters
+            FormModel.Description = InputValidationHelper.FilterInput(rawValue, InputTypeEnum.Description);
+        }
+        else
+        {
+            descriptionValidationError = null;
+            FormModel.Description = rawValue;
+        }
+    }
+
+    private bool HasValidationErrors()
+    {
+        return codeValidationError != null || nameValidationError != null || descriptionValidationError != null;
+    }
+
+    private async Task HandleCancel()
+    {
+        if (!IsSaving)
+        {
+            // Reset validation errors
+            codeValidationError = null;
+            nameValidationError = null;
+            descriptionValidationError = null;
+            await OnCancel.InvokeAsync();
+            await JS.InvokeVoidAsync("enableScroll");
+
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // Final validation before submit
+        var (codeValid, codeError) = IsEditMode ? (true, null) : InputValidationHelper.ValidateInput(FormModel.Code, InputTypeEnum.Code, required: true);
+        var (nameValid, nameError) = InputValidationHelper.ValidateInput(FormModel.Name, InputTypeEnum.Name, required: true);
+        var (descValid, descError) = InputValidationHelper.ValidateInput(FormModel.Description, InputTypeEnum.Description, required: false);
+        
+        codeValidationError = codeError;
+        nameValidationError = nameError;
+        descriptionValidationError = descError;
+        
+        if (!codeValid || !nameValid || !descValid)
+        {
+            return;
+        }
+        
+        // Sanitize before submit
+        if (!IsEditMode)
+        {
+            FormModel.Code = FormModel.Code.ToUpper();
+        }
+        FormModel.Name = InputValidationHelper.Sanitize(FormModel.Name);
+        FormModel.Description = InputValidationHelper.SanitizeText(FormModel.Description);
+        
+        await OnSubmit.InvokeAsync(FormModel);
+        await JS.InvokeVoidAsync("enableScroll");
+
+    }
+
+    public class DepartmentFormModel
+    {
+        [Required(ErrorMessage = "Code is required")]
+        [StringLength(10, ErrorMessage = "Code cannot exceed 10 characters")]
+        [RegularExpression(@"^[A-Z0-9\-_]+$", ErrorMessage = "Code must contain only uppercase letters, numbers, hyphens, and underscores")]
+        public string Code { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Name is required")]
+        [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters")]
+        public string? Description { get; set; }
+    }
+}
